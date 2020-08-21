@@ -21,7 +21,6 @@ http_archive(
     sha256 = "750186951a699cb73d6b440c7cd06f4b2b80fd3ebb00cbe00f655c7da4ae243e",
     strip_prefix = "tensorflow-%s" % _TENSORFLOW_GIT_COMMIT,
     urls = [
-        "https://mirror.bazel.build/github.com/tensorflow/tensorflow/archive/%s.tar.gz" % _TENSORFLOW_GIT_COMMIT,
         "https://github.com/tensorflow/tensorflow/archive/%s.tar.gz" % _TENSORFLOW_GIT_COMMIT,
     ],
 )
