@@ -324,13 +324,13 @@ class QueryExecutor {
                                          int64 event_time_milliseconds,
                                          int64* event_id) = 0;
 
-  // Queries events from the Event table by its artifact id.
-  virtual tensorflow::Status SelectEventByArtifactID(
-      int64 artifact_id, RecordSet* event_record_set) = 0;
+  // Queries events from the Event table by a collection of artifact ids.
+  virtual tensorflow::Status SelectEventByArtifactIDs(
+      const std::vector<int64>& artifact_ids, RecordSet* event_record_set) = 0;
 
-  // Queries events from the Event table by its execution id.
-  virtual tensorflow::Status SelectEventByExecutionID(
-      int64 execution_id, RecordSet* event_record_set) = 0;
+  // Queries events from the Event table by a collection of execution ids.
+  virtual tensorflow::Status SelectEventByExecutionIDs(
+      const std::vector<int64>& execution_ids, RecordSet* event_record_set) = 0;
 
   // Checks the existence of the EventPath table.
   virtual tensorflow::Status CheckEventPathTable() = 0;
@@ -339,9 +339,9 @@ class QueryExecutor {
   virtual tensorflow::Status InsertEventPath(int64 event_id,
                                              const Event::Path::Step& step) = 0;
 
-  // Queries paths from the database by event id.
-  virtual tensorflow::Status SelectEventPathByEventID(
-      int64 event_id, RecordSet* record_set) = 0;
+  // Queries paths from the database by a collection of event ids.
+  virtual tensorflow::Status SelectEventPathByEventIDs(
+      const std::vector<int64>& event_ids, RecordSet* record_set) = 0;
 
   // Checks the existence of the Association table.
   virtual tensorflow::Status CheckAssociationTable() = 0;
@@ -413,6 +413,26 @@ class QueryExecutor {
   // Select all context IDs.
   // Returns a list of IDs.
   virtual tensorflow::Status SelectAllContextIDs(RecordSet* set) = 0;
+
+  // List Artifact IDs using `options`.
+  // On success `record_set` is updated with artifact IDs based on `options`
+  virtual tensorflow::Status ListArtifactIDsUsingOptions(
+      const ListOperationOptions& options, RecordSet* record_set) = 0;
+
+  // List Execution IDs using `options`.
+  // On success `set` is updated with execution IDs based on `options` and
+  // `next_page_token` is updated with information for the caller to use for
+  // next page of results.
+  virtual tensorflow::Status ListExecutionIDsUsingOptions(
+      const ListOperationOptions& options, RecordSet* record_set) = 0;
+
+  // List Context IDs using `options`.
+  // On success `set` is updated with context IDs based on `options` and
+  // `next_page_token` is updated with information for the caller to use for
+  // next page of results.
+  virtual tensorflow::Status ListContextIDsUsingOptions(
+      const ListOperationOptions& options, RecordSet* record_set) = 0;
+
 };
 
 }  // namespace ml_metadata

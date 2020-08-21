@@ -27,10 +27,12 @@ limitations under the License.
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "ml_metadata/metadata_store/list_operation_query_helper.h"
+#include "ml_metadata/metadata_store/list_operation_util.h"
 #include "ml_metadata/proto/metadata_source.pb.h"
+#include "ml_metadata/proto/metadata_store.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
-
 namespace ml_metadata {
 
 tensorflow::Status QueryConfigExecutor::InsertEventPath(
@@ -259,6 +261,10 @@ std::string QueryConfigExecutor::Bind(Execution::State value) {
   return std::to_string((int)value);
 }
 
+std::string QueryConfigExecutor::Bind(const std::vector<int64>& value) {
+  return absl::StrJoin(value, ", ");
+}
+
 std::string QueryConfigExecutor::BindValue(const Value& value) {
   switch (value.value_case()) {
     case PropertyType::INT:
@@ -454,5 +460,55 @@ tensorflow::Status QueryConfigExecutor::InsertExecutionType(
        Bind(has_output_type, output_type)},
       execution_type_id);
 }
+
+template <typename Node>
+tensorflow::Status QueryConfigExecutor::ListNodeIDsUsingOptions(
+    const ListOperationOptions& options, RecordSet* record_set) {
+  int64 id_offset, field_offset;
+  if (!options.next_page_token().empty()) {
+    ListOperationNextPageToken next_page_token;
+    TF_RETURN_IF_ERROR(DecodeListOperationNextPageToken(
+        options.next_page_token(), next_page_token));
+    TF_RETURN_IF_ERROR(ValidateListOperationOptionsAreIdentical(
+        next_page_token.set_options(), options));
+    id_offset = next_page_token.id_offset();
+    field_offset = next_page_token.field_offset();
+  } else {
+    SetListOperationInitialValues(options, field_offset, id_offset);
+  }
+
+  std::string sql_query;
+  if (std::is_same<Node, Artifact>::value) {
+    sql_query = "SELECT `id` FROM `Artifact` WHERE";
+  } else if (std::is_same<Node, Execution>::value) {
+    sql_query = "SELECT `id` FROM `Execution` WHERE";
+  } else if (std::is_same<Node, Context>::value) {
+    sql_query = "select `id` FROM `Context` WHERE";
+  } else {
+    return tensorflow::errors::InvalidArgument(
+        "Invalid Node passed to ListNodeIDsUsingOptions");
+  }
+  TF_RETURN_IF_ERROR(AppendOrderingThresholdClause(options, id_offset,
+                                                   field_offset, sql_query));
+  TF_RETURN_IF_ERROR(AppendOrderByClause(options, sql_query));
+  TF_RETURN_IF_ERROR(AppendLimitClause(options, sql_query));
+  return ExecuteQuery(sql_query, record_set);
+}
+
+tensorflow::Status QueryConfigExecutor::ListArtifactIDsUsingOptions(
+    const ListOperationOptions& options, RecordSet* record_set) {
+  return ListNodeIDsUsingOptions<Artifact>(options, record_set);
+}
+
+tensorflow::Status QueryConfigExecutor::ListExecutionIDsUsingOptions(
+    const ListOperationOptions& options, RecordSet* record_set) {
+  return ListNodeIDsUsingOptions<Execution>(options, record_set);
+}
+
+tensorflow::Status QueryConfigExecutor::ListContextIDsUsingOptions(
+    const ListOperationOptions& options, RecordSet* record_set) {
+  return ListNodeIDsUsingOptions<Context>(options, record_set);
+}
+
 
 }  // namespace ml_metadata

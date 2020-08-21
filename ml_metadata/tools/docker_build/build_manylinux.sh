@@ -46,19 +46,16 @@ function setup_environment() {
   export PYTHON_BIN_PATH="${PYTHON_DIR}"/bin/python
   echo "PYTHON_BIN_PATH=${PYTHON_BIN_PATH}"
   ${PIP_BIN} install --upgrade pip
-  ${PIP_BIN} install wheel
+  ${PIP_BIN} install --upgrade wheel
   ${PIP_BIN} install numpy
   # Auditwheel does not have a python2 version and auditwheel is just a binary.
   pip3 install auditwheel
 }
 
-function bazel_build() {
+function build_wheel() {
   rm -f .bazelrc
   rm -rf dist
-  bazel run -c opt \
-    --define grpc_no_ares=true ml_metadata:build_pip_package \
-    --\
-    --python_bin_path "${PYTHON_BIN_PATH}"
+  "${PYTHON_BIN_PATH}" setup.py bdist_wheel
 }
 
 function stamp_wheel() {
@@ -71,7 +68,7 @@ function stamp_wheel() {
 setup_environment
 set -e
 set -x
-bazel_build
+build_wheel
 stamp_wheel
 
 set +e

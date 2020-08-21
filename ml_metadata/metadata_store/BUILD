@@ -66,11 +66,13 @@ cc_library(
     ],
     deps = [
         ":constants",
+        ":list_operation_util",
         ":metadata_access_object_base",
         ":metadata_source",
         ":query_executor",
         "@com_google_protobuf//:protobuf",
         
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
@@ -110,6 +112,8 @@ cc_library(
         "query_config_executor.h",
     ],
     deps = [
+        ":list_operation_query_helper",
+        ":list_operation_util",
         ":metadata_access_object_base",
         ":metadata_source",
         ":query_executor",
@@ -128,6 +132,19 @@ cc_library(
     name = "list_operation_query_helper",
     srcs = ["list_operation_query_helper.cc"],
     hdrs = ["list_operation_query_helper.h"],
+    deps = [
+        ":list_operation_util",
+        ":types",
+        "@com_google_absl//absl/strings",
+        "//ml_metadata/proto:metadata_store_proto",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "list_operation_util",
+    srcs = ["list_operation_util.cc"],
+    hdrs = ["list_operation_util.h"],
     deps = [
         ":types",
         "@com_google_absl//absl/strings",
@@ -394,8 +411,6 @@ ml_metadata_cc_test(
 cc_library(
     name = "types",
     hdrs = ["types.h"],
-    deps = [
-    ],
 )
 
 # Note that the name of the target should follow specific naming

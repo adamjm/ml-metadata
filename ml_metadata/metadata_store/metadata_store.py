@@ -24,16 +24,16 @@ from __future__ import print_function
 
 import random
 import time
+from typing import Iterable, List, Optional, Sequence, Text, Tuple, Union
 
 from absl import logging
 import grpc
-from typing import Iterable, List, Optional, Sequence, Text, Tuple, Union
 
+from ml_metadata import errors
 from ml_metadata.metadata_store import pywrap_tf_metadata_store_serialized as metadata_store_serialized
 from ml_metadata.proto import metadata_store_pb2
 from ml_metadata.proto import metadata_store_service_pb2
 from ml_metadata.proto import metadata_store_service_pb2_grpc
-from tensorflow.compat.v1 import errors
 
 
 class MetadataStore(object):
@@ -80,15 +80,13 @@ class MetadataStore(object):
       raise ValueError('Upgrade migration is not allowed when using gRPC '
                        'connection client. Upgrade needs to be performed on '
                        'the server side.')
-    target = ':'.join([config.host, str(config.port)])
-    channel = self._get_channel(config, target)
+    channel = self._get_channel(config)
     self._metadata_store_stub = (metadata_store_service_pb2_grpc.
                                  MetadataStoreServiceStub(channel))
     logging.log(logging.INFO, 'MetadataStore with gRPC connection initialized')
     logging.log(logging.DEBUG, 'ConnectionConfig: %s', config)
 
-  def _get_channel(self, config: metadata_store_pb2.MetadataStoreClientConfig,
-                   target: Text):
+  def _get_channel(self, config: metadata_store_pb2.MetadataStoreClientConfig):
     """Configures the channel, which could be secure or insecure.
 
     It returns a channel that can be specified to be secure or insecure,
@@ -96,11 +94,12 @@ class MetadataStore(object):
 
     Args:
       config: metadata_store_pb2.MetadataStoreClientConfig.
-      target: target host with port.
 
     Returns:
       an initialized gRPC channel.
     """
+    target = ':'.join([config.host, str(config.port)])
+
     if not config.HasField('ssl_config'):
       return grpc.insecure_channel(target)
 
@@ -123,13 +122,16 @@ class MetadataStore(object):
     if self._using_db_connection and hasattr(self, '_metadata_store'):
       metadata_store_serialized.DestroyMetadataStore(self._metadata_store)
 
-  def _call(self, method_name, request, response) -> None:
+  def _call(self, method_name, request, response):
     """Calls method with retry when Aborted error is returned.
 
     Args:
       method_name: the method to call.
       request: the request protobuf message.
       response: the response protobuf message.
+
+    Returns:
+      Detailed errors if the method is failed.
     """
     num_retries = self._max_num_retries
     avg_delay_sec = 2
@@ -540,6 +542,31 @@ class MetadataStore(object):
       result.append(x)
     return result
 
+  def get_artifact_by_type_and_name(
+      self, type_name: Text,
+      artifact_name: Text) -> Optional[metadata_store_pb2.Artifact]:
+    """Get the artifact of the given type and name.
+
+    The API fails if more than one artifact is found.
+
+    Args:
+      type_name: The artifact type name to look for.
+      artifact_name: The artifact name to look for.
+
+    Returns:
+      The Artifact matching the type and name.
+      None if no matched Artifact was found.
+    """
+    request = metadata_store_service_pb2.GetArtifactByTypeAndNameRequest()
+    request.type_name = type_name
+    request.artifact_name = artifact_name
+    response = metadata_store_service_pb2.GetArtifactByTypeAndNameResponse()
+
+    self._call('GetArtifactByTypeAndName', request, response)
+    if not response.HasField('artifact'):
+      return None
+    return response.artifact
+
   def get_artifacts_by_uri(self,
                            uri: Text) -> List[metadata_store_pb2.Artifact]:
     """Gets all the artifacts of a given uri."""
@@ -577,7 +604,7 @@ class MetadataStore(object):
     return result
 
   def get_artifact_type(
-      self, type_name: Text) -> Optional[metadata_store_pb2.ArtifactType]:
+      self, type_name: Text) -> metadata_store_pb2.ArtifactType:
     """Gets an artifact type by name.
 
     Args:
@@ -616,7 +643,7 @@ class MetadataStore(object):
     return result
 
   def get_execution_type(
-      self, type_name: Text) -> Optional[metadata_store_pb2.ExecutionType]:
+      self, type_name: Text) -> metadata_store_pb2.ExecutionType:
     """Gets an execution type by name.
 
     Args:
@@ -655,7 +682,7 @@ class MetadataStore(object):
     return result
 
   def get_context_type(
-      self, type_name: Text) -> Optional[metadata_store_pb2.ContextType]:
+      self, type_name: Text) -> metadata_store_pb2.ContextType:
     """Gets a context type by name.
 
     Args:
@@ -705,6 +732,31 @@ class MetadataStore(object):
     for x in response.executions:
       result.append(x)
     return result
+
+  def get_execution_by_type_and_name(
+      self, type_name: Text,
+      execution_name: Text) -> Optional[metadata_store_pb2.Execution]:
+    """Get the execution of the given type and name.
+
+    The API fails if more than one execution is found.
+
+    Args:
+      type_name: The execution type name to look for.
+      execution_name: The execution name to look for.
+
+    Returns:
+      The Execution matching the type and name.
+      None if no matched Execution found.
+    """
+    request = metadata_store_service_pb2.GetExecutionByTypeAndNameRequest()
+    request.type_name = type_name
+    request.execution_name = execution_name
+    response = metadata_store_service_pb2.GetExecutionByTypeAndNameResponse()
+
+    self._call('GetExecutionByTypeAndName', request, response)
+    if not response.HasField('execution'):
+      return None
+    return response.execution
 
   def get_executions_by_id(
       self, execution_ids: Iterable[int]) -> List[metadata_store_pb2.Execution]:
@@ -1129,6 +1181,6 @@ def _make_exception(msg, error_code):
     # log internal backend engine errors only.
     if error_code == errors.INTERNAL:
       logging.log(logging.WARNING, 'mlmd client %s: %s', exc_type.__name__, msg)
-    return exc_type(None, None, msg)
+    return exc_type(msg)
   except KeyError:
-    return errors.UnknownError(None, None, msg, error_code)
+    return errors.UnknownError(msg)

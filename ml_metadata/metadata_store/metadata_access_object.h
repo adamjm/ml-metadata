@@ -181,6 +181,40 @@ class MetadataAccessObject {
                                            std::vector<Artifact>* artifacts,
                                            std::string* next_page_token) = 0;
 
+  // Queries executions stored in the metadata source using `options`.
+  // `options` is the ListOperationOptions proto message defined
+  // in metadata_store.
+  // If successfull:
+  // 1. `executions` is updated with result set of size determined by
+  //    max_result_size set in `options`.
+  // 2. `next_page_token` is populated with information necessary to fetch next
+  //    page of results.
+  // RETURNS INVALID_ARGUMENT if the `options` is invalid with one of
+  //    the cases:
+  // 1. order_by_field is not set or has an unspecified field.
+  // 2. Direction of ordering is not specified for the order_by_field.
+  // 3. next_page_token cannot be decoded.
+  virtual tensorflow::Status ListExecutions(const ListOperationOptions& options,
+                                            std::vector<Execution>* executions,
+                                            std::string* next_page_token) = 0;
+
+  // Queries contexts stored in the metadata source using `options`.
+  // `options` is the ListOperationOptions proto message defined
+  // in metadata_store.
+  // If successfull:
+  // 1. `contexts` is updated with result set of size determined by
+  //    max_result_size set in `options`.
+  // 2. `next_page_token` is populated with information necessary to fetch next
+  //    page of results.
+  // RETURNS INVALID_ARGUMENT if the `options` is invalid with one of
+  //    the cases:
+  // 1. order_by_field is not set or has an unspecified field.
+  // 2. Direction of ordering is not specified for the order_by_field.
+  // 3. next_page_token cannot be decoded.
+  virtual tensorflow::Status ListContexts(const ListOperationOptions& options,
+                                          std::vector<Context>* contexts,
+                                          std::string* next_page_token) = 0;
+
   // Queries an artifact by its type_id and name.
   // Returns NOT_FOUND error, if no artifact can be found.
   // Returns detailed INTERNAL error, if query execution fails.
@@ -311,17 +345,15 @@ class MetadataAccessObject {
   virtual tensorflow::Status CreateEvent(const Event& event,
                                          int64* event_id) = 0;
 
-  // Queries the events associated with an artifact_id.
+  // Queries the events associated with a collection of artifact_ids.
   // Returns INVALID_ARGUMENT error, if the `events` is null.
-  // Returns NOT_FOUND error, if there are no events found with the `artifact`.
-  virtual tensorflow::Status FindEventsByArtifact(
-      int64 artifact_id, std::vector<Event>* events) = 0;
+  virtual tensorflow::Status FindEventsByArtifacts(
+      const std::vector<int64>& artifact_ids, std::vector<Event>* events) = 0;
 
-  // Queries the events associated with an execution_id.
+  // Queries the events associated with a collection of execution_ids.
   // Returns INVALID_ARGUMENT error, if the `events` is null.
-  // Returns NOT_FOUND error, if there are no events found with the `execution`.
-  virtual tensorflow::Status FindEventsByExecution(
-      int64 execution_id, std::vector<Event>* events) = 0;
+  virtual tensorflow::Status FindEventsByExecutions(
+      const std::vector<int64>& execution_ids, std::vector<Event>* events) = 0;
 
   // Creates an association, returns the assigned association id.
   // Returns INVALID_ARGUMENT error, if no context matches the context_id.
@@ -373,6 +405,7 @@ class MetadataAccessObject {
   // config with the `schema_version` stored in the database, and migrate the
   // database if needed.
   virtual int64 GetLibraryVersion() = 0;
+
 };
 
 }  // namespace ml_metadata
